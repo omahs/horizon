@@ -17,3 +17,35 @@ This repository contains multiple key directories, namely:
 
 The `Project`, `Vendor` and `Investor` are the core objects, that augment the information in `SocialDB` with the specific context
 that this AccountId represents in `Horizon`.
+
+
+## Getting Started
+
+[Install NEAR CLI](https://docs.near.org/tools/near-cli#installation):
+```
+rustup target add wasm32-unknown-unknown
+```
+### Build Horizon Contract
+```
+./build.sh
+```
+### Build Credits Contract
+```
+./build_token.sh
+```
+### Example Usage
+
+Deploy Horizon Contract:
+
+```
+export ACCT=horizon.kenhorizon.testnet
+./dev_deploy.sh $ACCT
+```
+
+Interact with the contract like:
+```
+near call $ACCT new '{"owner_id": "kenhorizon.testnet"}' --account-id kenhorizon.testnet
+near call $ACCT add_project '{"account_id": "kenproj.testnet"}' --account-id kenhorizon.testnet
+near call $ACCT add_team '{"account_id": "other.testnet", "team": ""}' --account-id kenhorizon.testnet
+
+```

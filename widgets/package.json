@@ -5,6 +5,7 @@
     "format": "prettier **/*.{js,jsx,ts,tsx} --write --ignore-unknown",
     "download": "bos download nearhorizon.near network-config mainnet",
     "deploy": "bos components deploy nearhorizon.near sign-as nearhorizon.near network-config mainnet sign-with-access-key-file ~/.near-credentials/mainnet/nearhorizon.near.json send",
+    "test_deploy": "bos components deploy kenhorizon.testnet sign-as kenhorizon.testnet network-config testnet sign-with-access-key-file ~/.near-credentials/testnet/kenhorizon.testnet.json send",
     "dev": "npm-watch"
   },
   "devDependencies": {

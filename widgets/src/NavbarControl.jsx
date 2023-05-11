@@ -1,8 +1,22 @@
-const ownerId = "nearhorizon.near";
+const ownerId = "kenhorizon.testnet";
 
 State.init({
   credits: 0,
+  allowed: true,
+  account: "nearhorizon.near",
 });
+
+const check = Near.view("token.kenhorizon.testnet", "on_allowlist", {account_id: "kenhorizon.testnet"});
+console.log("CHECK");
+console.log(check);
+if (check == true) {
+  State.update({allowed: true});
+} else {
+  State.update({allowed: false})
+};
+
+console.log("IS ALLOWED");
+console.log(state.allowed);
 
 const Navbar = styled.div`
   z-index: 2;
@@ -111,9 +125,25 @@ const stats = (
   </Stats>
 );
 
+const stats_disabled = (
+  <div> </div>
+);
+
+
+function displayCredits(props) {
+  const show = state.allowed;
+  if (show) {
+    return stats;
+  }
+  return stats_disabled;
+}
+
+let value = displayCredits(state.allowed);
+
+
 const actions = (
   <ActionArea>
-    {stats}
+    {value}
     <Widget src={`${ownerId}/widget/CreateNewInput`} />
   </ActionArea>
 );

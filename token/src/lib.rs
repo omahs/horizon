@@ -68,10 +68,12 @@ impl Contract {
         contract
     }
 
+    /// Returns boolean indicating whether the given account ID is on the allowlist.
     pub fn on_allowlist(&self, account_id: AccountId) -> bool {
         self.allowlist.contains(&account_id.clone().into())
     }
 
+    /// adds credits to total_supply
     #[payable]
     pub fn add_deposit(&mut self, deposit: U128) {
         self.assert_owner();
@@ -79,6 +81,7 @@ impl Contract {
         self.deposit_unchecked(&self.own_get_owner().unwrap(), deposit.into());
     }
 
+    /// registers an account on the allowlist 
     #[payable]
     pub fn register_holder(&mut self, account_id: AccountId) {
         self.assert_owner();
@@ -86,11 +89,13 @@ impl Contract {
         self.allowlist.insert(account_id.into());
     }
 
+    /// removes an account from the allowlist
     pub fn remove_holder(&mut self, account_id: AccountId) {
         self.assert_owner();
         self.allowlist.remove(&account_id.into());
     }
 
+    /// idk what this does
     #[payable]
     pub fn claim_credits(&mut self) {
         assert_one_yocto();
@@ -104,6 +109,7 @@ impl Contract {
         );
     }
 
+    /// funds a single account on the allowlist with the default amount of credits
     #[payable]
     pub fn fund_program_participant(&mut self, account_id: AccountId) {
         self.assert_owner();
@@ -117,6 +123,7 @@ impl Contract {
         );
     }
 
+    /// funds multiple accounts on the allowlist with the default amount of credits
     #[payable]
     pub fn fund_program_participants(&mut self, account_ids: Vec<AccountId>) {
         self.assert_owner();
@@ -132,6 +139,7 @@ impl Contract {
         }
     }
 
+    /// funds a single account on the allowlist with a specified amount of credits
     #[payable]
     pub fn fund_program_participant_with_amount(
         &mut self,
@@ -149,6 +157,7 @@ impl Contract {
         );
     }
 
+    /// funds multiple accounts on the allowlist with a specified amount of credits
     #[payable]
     pub fn fund_program_participants_with_amount(
         &mut self,
@@ -170,6 +179,7 @@ impl Contract {
 }
 
 impl Nep141Hook for Contract {
+    /// checks that the sender and receiver are on the allowlist
     fn before_transfer(&mut self, transfer: &Nep141Transfer) {
         require!(
             self.allowlist.contains(&transfer.sender_id.clone().into()),
@@ -182,9 +192,9 @@ impl Nep141Hook for Contract {
         )
     }
 
+    /// emits a Transfer event
     fn after_transfer(&mut self, _transfer: &Nep141Transfer, _state: ()) {}
 }
-
 
 
 #[cfg(test)]
