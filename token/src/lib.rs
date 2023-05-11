@@ -5,7 +5,7 @@ use near_sdk::{assert_one_yocto, env, require};
 use near_sdk::{near_bindgen, AccountId};
 use near_sdk_contract_tools::owner::OwnerExternal;
 use near_sdk_contract_tools::standard::nep141::{
-    Nep141, Nep141Controller, Nep141Hook, Nep141Transfer,
+    Nep141, Nep141Controller, Nep141Hook, Nep141Transfer, Nep141Resolver,
 };
 use near_sdk_contract_tools::{owner::Owner, FungibleToken, Owner};
 
@@ -30,12 +30,21 @@ impl From<VersionedAllowList> for AccountId {
 }
 
 /// The fungible token contract struct.
-#[derive(Owner, FungibleToken)]
+#[derive(BorshDeserialize, BorshSerialize, Owner, FungibleToken)]
 #[fungible_token(name = "NEAR Horizon", symbol = "NHZN", decimals = 4)]
 #[near_bindgen]
 pub struct Contract {
     allowlist: LookupSet<VersionedAllowList>,
     fund_amount: u128,
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self {
+            allowlist: LookupSet::new(b"allowlist".to_vec()),
+            fund_amount: 0,
+        }
+    }
 }
 
 /// A constant representing one NEAR Horizon token (10^4 miliNHZN).
@@ -59,6 +68,10 @@ impl Contract {
         contract
     }
 
+    pub fn on_allowlist(&self, account_id: AccountId) -> bool {
+        self.allowlist.contains(&account_id.clone().into())
+    }
+
     #[payable]
     pub fn add_deposit(&mut self, deposit: U128) {
         self.assert_owner();
@@ -71,6 +84,11 @@ impl Contract {
         self.assert_owner();
         assert_one_yocto();
         self.allowlist.insert(account_id.into());
+    }
+
+    pub fn remove_holder(&mut self, account_id: AccountId) {
+        self.assert_owner();
+        self.allowlist.remove(&account_id.into());
     }
 
     #[payable]
@@ -98,6 +116,57 @@ impl Contract {
             Some("Awarding credits to program participant".to_string()),
         );
     }
+
+    #[payable]
+    pub fn fund_program_participants(&mut self, account_ids: Vec<AccountId>) {
+        self.assert_owner();
+        assert_one_yocto();
+        for account_id in account_ids {
+            self.allowlist.insert(account_id.clone().into());
+            self.transfer(
+                self.own_get_owner().unwrap(),
+                account_id,
+                self.fund_amount,
+                Some("Awarding credits to program participant".to_string()),
+            );
+        }
+    }
+
+    #[payable]
+    pub fn fund_program_participant_with_amount(
+        &mut self,
+        account_id: AccountId,
+        amount: U128,
+    ) {
+        self.assert_owner();
+        assert_one_yocto();
+        self.allowlist.insert(account_id.clone().into());
+        self.transfer(
+            self.own_get_owner().unwrap(),
+            account_id,
+            amount.into(),
+            Some("Awarding credits to program participant".to_string()),
+        );
+    }
+
+    #[payable]
+    pub fn fund_program_participants_with_amount(
+        &mut self,
+        account_ids: Vec<AccountId>,
+        amount: U128,
+    ) {
+        self.assert_owner();
+        assert_one_yocto();
+        for account_id in account_ids {
+            self.allowlist.insert(account_id.clone().into());
+            self.transfer(
+                self.own_get_owner().unwrap(),
+                account_id,
+                amount.into(),
+                Some("Awarding credits to program participant".to_string()),
+            );
+        }
+    }
 }
 
 impl Nep141Hook for Contract {
@@ -116,6 +185,8 @@ impl Nep141Hook for Contract {
     fn after_transfer(&mut self, _transfer: &Nep141Transfer, _state: ()) {}
 }
 
+
+
 #[cfg(test)]
 mod tests {
     use near_sdk::{test_utils::VMContextBuilder, testing_env};
@@ -131,6 +202,27 @@ mod tests {
 
         assert_eq!(contract.own_get_owner(), Some(bob));
         assert_eq!(contract.ft_total_supply(), total_supply.into());
+    }
+
+    #[test]
+    fn test_on_allowlist() {
+        let bob: AccountId = "bob.near".parse().unwrap();
+        let alice: AccountId = "alice.near".parse().unwrap();
+        let total_supply = 1_000_000;
+        let mut contract = Contract::new(bob.clone(), total_supply.into(), None);
+        
+        let context = VMContextBuilder::new()
+            .predecessor_account_id(bob.clone())
+            .attached_deposit(1)
+            .build();
+        testing_env!(context);
+
+        let transfer_amount = 1_000;
+
+        contract.register_holder(alice.clone());
+
+        assert_eq!(contract.on_allowlist(bob), true);
+        assert_eq!(contract.on_allowlist(alice), true);
     }
 
     #[test]
@@ -191,6 +283,36 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_holder() {
+        let bob: AccountId = "bob.near".parse().unwrap();
+        let alice: AccountId = "alice.near".parse().unwrap();
+        let total_supply = 1_000_000;
+        let mut contract = Contract::new(bob.clone(), total_supply.into(), None);
+
+        let context = VMContextBuilder::new()
+            .predecessor_account_id(bob.clone())
+            .attached_deposit(1)
+            .build();
+
+        testing_env!(context);
+
+        let transfer_amount = 1_000;
+
+        contract.register_holder(alice.clone());
+        contract.transfer(bob.clone(), alice.clone(), transfer_amount, None);
+
+        assert_eq!(contract.ft_balance_of(alice.clone()), transfer_amount.into());
+        assert_eq!(
+            contract.ft_balance_of(bob),
+            (total_supply - transfer_amount).into()
+        );
+        assert_eq!(contract.ft_total_supply(), total_supply.into());
+
+        contract.remove_holder(alice.clone());
+        assert_eq!(contract.on_allowlist(alice.clone()), false);
+    }
+
+    #[test]
     fn test_claim_credits() {
         let bob: AccountId = "bob.near".parse().unwrap();
         let alice: AccountId = "alice.near".parse().unwrap();
@@ -228,7 +350,7 @@ mod tests {
         let bob: AccountId = "bob.near".parse().unwrap();
         let alice: AccountId = "alice.near".parse().unwrap();
         let total_supply = 1_000_000;
-        let mut contract = Contract::new(bob.clone(), total_supply.into(), None);
+        let mut contract = Contract::new(bob.clone(), total_supply.into(), Some(50_000.into()));
 
         let context = VMContextBuilder::new()
             .predecessor_account_id(bob.clone())
@@ -236,11 +358,39 @@ mod tests {
             .build();
 
         testing_env!(context);
+        contract.register_holder(alice.clone());
 
         contract.fund_program_participant(alice.clone());
 
         assert_eq!(contract.ft_balance_of(alice), 50_000.into());
         assert_eq!(contract.ft_balance_of(bob), (total_supply - 50_000).into());
         assert_eq!(contract.ft_total_supply(), total_supply.into());
+    }
+
+    #[test]
+    fn test_burn_credits() {
+        let bob: AccountId = "bob.near".parse().unwrap();
+        let alice: AccountId = "alice.near".parse().unwrap();
+        let total_supply = 1_000_000;
+        let mut contract = Contract::new(bob.clone(), total_supply.into(), Some(50_000.into()));
+
+        let context = VMContextBuilder::new()
+            .predecessor_account_id(bob.clone())
+            .attached_deposit(1)
+            .build();
+
+        testing_env!(context);
+        contract.register_holder(alice.clone());
+
+        contract.fund_program_participant(alice.clone());
+
+        assert_eq!(contract.ft_balance_of(alice.clone()), 50_000.into());
+        assert_eq!(contract.ft_balance_of(bob), (total_supply - 50_000).into());
+        assert_eq!(contract.ft_total_supply(), total_supply.into());
+
+        contract.burn(alice.clone(), 10_000, Some("expired credit duration".to_string()));
+
+        assert_eq!(contract.ft_balance_of(alice.clone()), 40_000.into());
+        assert_eq!(contract.ft_total_supply(),990_000.into());
     }
 }
