@@ -126,6 +126,7 @@ return (
       </FirstSubSection>
       <br />
       <br />
+      
       <h3>Landing Page</h3>
       <p>
         Whether you've navigated to the NEAR Horizon landing page from a shared
